@@ -1,20 +1,20 @@
 pipeline {
     agent any
-
+ 
     environment {
         DOCKER_REGISTRY = "rushikeshdoc"
         BACKEND_IMAGE = "backend:latest"
         FRONTEND_IMAGE = "frontend:latest"
         COMPOSE_FILE = "docker-compose.yml"
     }
-
+ 
     stages {
         stage('Checkout') {
             steps {
                 git url: 'https://github.com/rushikeshgoal/hrmsdemo.git', branch: 'main'
             }
         }
-
+ 
         stage('Build Backend Docker Image') {
             steps {
                 dir('Backend_hrms') {
@@ -22,7 +22,16 @@ pipeline {
                 }
             }
         }
-
+ 
+        stage('Build Frontend') {
+            steps {
+                dir('frontend') {
+                    sh 'npm ci'
+                    sh 'npm run build'
+                }
+            }
+        }
+ 
         stage('Build Frontend Docker Image') {
             steps {
                 dir('frontend') {
@@ -30,12 +39,11 @@ pipeline {
                 }
             }
         }
-
+ 
         stage('Push Docker Images') {
             steps {
-                // Use Jenkins credentials for Docker Hub login
-                withCredentials([usernamePassword(credentialsId: 'dockerhub-cred', 
-                                                  usernameVariable: 'DOCKER_USER', 
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-cred',
+                                                  usernameVariable: 'DOCKER_USER',
                                                   passwordVariable: 'DOCKER_PASS')]) {
                     sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
                 }
@@ -43,20 +51,19 @@ pipeline {
                 sh "docker push $DOCKER_REGISTRY/$FRONTEND_IMAGE"
             }
         }
-
+ 
         stage('Deploy with Docker Compose') {
             steps {
                 sh "docker compose -f $COMPOSE_FILE down"
-                sh "docker system prune -f" // optional cleanup
+                sh "docker system prune -f"
                 sh "docker compose -f $COMPOSE_FILE up -d --build"
             }
         }
     }
-
+ 
     post {
         always {
             echo 'Pipeline finished.'
         }
     }
 }
-
